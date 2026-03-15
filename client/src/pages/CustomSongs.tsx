@@ -20,6 +20,12 @@ interface PricingTier {
   color: string;
 }
 
+const STRIPE_PAYMENT_LINKS: Record<string, string> = {
+  basic: "https://buy.stripe.com/test_cNicN60yC1x3fCA96c4c800",
+  video: "https://buy.stripe.com/test_fZu6oIa9ca3z1LK8284c801",
+  premium: "https://buy.stripe.com/test_6oUdRabdg0sZ3TSaag4c802",
+};
+
 const pricingTiers: PricingTier[] = [
   {
     id: "basic",
@@ -231,12 +237,11 @@ export default function CustomSongs() {
       alert("Please upload at least one photo for your slideshow.");
       return;
     }
-    console.log("Order submitted:", {
-      tier: currentTier.name,
-      formData,
-      photos: uploadedPhotos.map((p) => p.file.name),
-    });
-    alert(`Order for ${currentTier.name} submitted! Proceeding to checkout...`);
+    // Redirect to Stripe Checkout
+    const paymentLink = STRIPE_PAYMENT_LINKS[currentTier.id];
+    if (paymentLink) {
+      window.location.href = paymentLink;
+    }
   };
 
   return (
