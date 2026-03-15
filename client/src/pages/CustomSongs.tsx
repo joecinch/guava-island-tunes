@@ -1,0 +1,469 @@
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Check, Music, Video, Users, Upload, X, ImageIcon } from "lucide-react";
+import { useState, useRef, useCallback } from "react";
+
+/**
+ * Custom Songs Page
+ * Three pricing tiers for custom song creation
+ */
+
+interface PricingTier {
+  id: string;
+  name: string;
+  price: number;
+  description: string;
+  icon: React.ReactNode;
+  features: string[];
+  deliverables: string[];
+  formFields: string[];
+  color: string;
+}
+
+const pricingTiers: PricingTier[] = [
+  {
+    id: "basic",
+    name: "Custom Song",
+    price: 100,
+    description: "Perfect for personal celebrations",
+    icon: <Music className="w-8 h-8" />,
+    features: [
+      "2 versions of your custom song",
+      "Personalized lyrics",
+      "Professional production",
+      "MP3 format delivery",
+    ],
+    deliverables: ["2 song versions", "MP3 files"],
+    formFields: ["names", "specialPlaces", "firstMeeting", "nicknames"],
+    color: "#E8614A",
+  },
+  {
+    id: "video",
+    name: "Custom Song + Slideshow",
+    price: 450,
+    description: "Bring your story to life",
+    icon: <Video className="w-8 h-8" />,
+    features: [
+      "2 versions of your custom song",
+      "Custom photo slideshow",
+      "Personalized lyrics",
+      "Picture integration",
+      "MP3 + MP4 delivery",
+    ],
+    deliverables: ["2 song versions", "1 photo slideshow", "MP3 + MP4 files"],
+    formFields: ["names", "specialPlaces", "firstMeeting", "nicknames", "pictures"],
+    color: "#F0C040",
+  },
+  {
+    id: "premium",
+    name: "Premium Package",
+    price: 1000,
+    description: "Full creative partnership",
+    icon: <Users className="w-8 h-8" />,
+    features: [
+      "One-on-one consultation",
+      "2 versions of your custom song",
+      "Custom photo slideshow",
+      "Professional music video",
+      "Unlimited revisions",
+      "Picture integration",
+      "Priority delivery",
+      "MP3 + MP4 delivery",
+    ],
+    deliverables: ["2 song versions", "1 photo slideshow", "1 music video", "Consultation calls", "MP3 + MP4 files"],
+    formFields: ["names", "specialPlaces", "firstMeeting", "nicknames", "pictures", "additionalDetails"],
+    color: "#D4A0A0",
+  },
+];
+
+interface UploadedPhoto {
+  file: File;
+  preview: string;
+  id: string;
+}
+
+function PhotoUploader({
+  photos,
+  onAdd,
+  onRemove,
+  accentColor,
+}: {
+  photos: UploadedPhoto[];
+  onAdd: (files: File[]) => void;
+  onRemove: (id: string) => void;
+  accentColor: string;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
+
+  const handleFiles = useCallback(
+    (files: FileList | null) => {
+      if (!files) return;
+      const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
+      onAdd(imageFiles);
+    },
+    [onAdd]
+  );
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    handleFiles(e.dataTransfer.files);
+  };
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-foreground mb-2">
+        Upload Your Photos
+        <span className="ml-2 text-xs font-normal text-muted-foreground">(3–20 photos recommended)</span>
+      </label>
+
+      {/* Drop Zone */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={handleDrop}
+        onClick={() => inputRef.current?.click()}
+        className="relative flex flex-col items-center justify-center gap-3 w-full border-2 border-dashed rounded-xl p-8 cursor-pointer transition-all duration-200"
+        style={{
+          borderColor: dragging ? accentColor : "#d1d5db",
+          backgroundColor: dragging ? `${accentColor}10` : "transparent",
+        }}
+      >
+        <Upload className="w-8 h-8" style={{ color: accentColor }} />
+        <div className="text-center">
+          <p className="text-sm font-medium text-foreground">
+            Drag & drop photos here, or <span style={{ color: accentColor }}>click to browse</span>
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">JPG, PNG, HEIC supported · Max 10 MB per photo</p>
+        </div>
+        <input
+          ref={inputRef}
+          type="file"
+          multiple
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => handleFiles(e.target.files)}
+        />
+      </div>
+
+      {/* Photo Previews */}
+      {photos.length > 0 && (
+        <div className="mt-4">
+          <p className="text-xs text-muted-foreground mb-2">{photos.length} photo{photos.length !== 1 ? "s" : ""} selected</p>
+          <div className="grid grid-cols-4 gap-2">
+            {photos.map((photo) => (
+              <div key={photo.id} className="relative group aspect-square rounded-lg overflow-hidden border border-border">
+                <img
+                  src={photo.preview}
+                  alt={photo.file.name}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onRemove(photo.id); }}
+                    className="bg-white rounded-full p-1 hover:bg-red-50 transition-colors"
+                  >
+                    <X className="w-3 h-3 text-red-500" />
+                  </button>
+                </div>
+                <div className="absolute bottom-0 left-0 right-0 bg-black/50 px-1 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <p className="text-white text-[9px] truncate">{photo.file.name}</p>
+                </div>
+              </div>
+            ))}
+            {/* Add More Button */}
+            <div
+              onClick={() => inputRef.current?.click()}
+              className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:border-primary transition-colors gap-1"
+            >
+              <ImageIcon className="w-5 h-5 text-muted-foreground" />
+              <span className="text-[10px] text-muted-foreground">Add more</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function CustomSongs() {
+  const [selectedTier, setSelectedTier] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [formData, setFormData] = useState<Record<string, string>>({});
+  const [uploadedPhotos, setUploadedPhotos] = useState<UploadedPhoto[]>([]);
+
+  const currentTier = pricingTiers.find((t) => t.id === selectedTier);
+
+  const handleSelectTier = (tierId: string) => {
+    setSelectedTier(tierId);
+    setShowForm(true);
+    setFormData({});
+    setUploadedPhotos([]);
+  };
+
+  const handleFormChange = (field: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleAddPhotos = (files: File[]) => {
+    const newPhotos: UploadedPhoto[] = files.map((file) => ({
+      file,
+      preview: URL.createObjectURL(file),
+      id: `${file.name}-${Date.now()}-${Math.random()}`,
+    }));
+    setUploadedPhotos((prev) => [...prev, ...newPhotos]);
+  };
+
+  const handleRemovePhoto = (id: string) => {
+    setUploadedPhotos((prev) => {
+      const photo = prev.find((p) => p.id === id);
+      if (photo) URL.revokeObjectURL(photo.preview);
+      return prev.filter((p) => p.id !== id);
+    });
+  };
+
+  const handleSubmit = () => {
+    if (!currentTier) return;
+    const needsPhotos = currentTier.formFields.includes("pictures");
+    if (needsPhotos && uploadedPhotos.length === 0) {
+      alert("Please upload at least one photo for your slideshow.");
+      return;
+    }
+    console.log("Order submitted:", {
+      tier: currentTier.name,
+      formData,
+      photos: uploadedPhotos.map((p) => p.file.name),
+    });
+    alert(`Order for ${currentTier.name} submitted! Proceeding to checkout...`);
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Navigation */}
+      <nav className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
+        <div className="container flex items-center justify-between py-4">
+          <a href="/" className="flex items-center gap-2">
+            <Music className="w-6 h-6" style={{ color: "#E8614A" }} />
+            <h1 className="text-2xl font-bold text-foreground" style={{ fontFamily: "'Cormorant Garamond', serif" }}>
+              Guava Island Tunes
+            </h1>
+          </a>
+          <a href="/" className="text-primary hover:text-primary/80 transition-colors">
+            Back to Store
+          </a>
+        </div>
+      </nav>
+
+      {/* Hero Section */}
+      <section className="py-16 bg-gradient-to-b from-primary/10 to-background">
+        <div className="container text-center space-y-4">
+          <h1
+            className="text-5xl md:text-6xl font-bold text-foreground"
+            style={{ fontFamily: "'Cormorant Garamond', serif" }}
+          >
+            Create Your Perfect Song
+          </h1>
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            Tell us your story, and we'll craft a beautiful custom song just for you. Choose the perfect package for your needs.
+          </p>
+        </div>
+      </section>
+
+      {/* Pricing Tiers */}
+      <section className="py-16">
+        <div className="container">
+          <div className="grid md:grid-cols-3 gap-8">
+            {pricingTiers.map((tier) => (
+              <Card
+                key={tier.id}
+                className="overflow-hidden border-0 hover:shadow-xl transition-shadow duration-300 flex flex-col"
+              >
+                <div
+                  className="p-6 text-white"
+                  style={{ backgroundColor: tier.color }}
+                >
+                  <div className="flex items-center gap-3 mb-4">{tier.icon}</div>
+                  <h2 className="text-2xl font-bold mb-2" style={{ fontFamily: "'Cormorant Garamond', serif" }}>
+                    {tier.name}
+                  </h2>
+                  <p className="text-sm opacity-90">{tier.description}</p>
+                </div>
+
+                <div className="p-6 flex-1 flex flex-col">
+                  <div className="mb-6">
+                    <div className="text-4xl font-bold text-foreground mb-2">
+                      ${tier.price}
+                    </div>
+                    <p className="text-sm text-muted-foreground">one-time payment</p>
+                  </div>
+
+                  <div className="space-y-3 mb-6 flex-1">
+                    {tier.features.map((feature, idx) => (
+                      <div key={idx} className="flex items-start gap-3">
+                        <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                        <span className="text-sm text-foreground">{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <Button
+                    size="lg"
+                    className="w-full text-white"
+                    style={{ backgroundColor: tier.color }}
+                    onClick={() => handleSelectTier(tier.id)}
+                  >
+                    Get Started
+                  </Button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Order Form Modal */}
+      {showForm && currentTier && (
+        <div className="fixed inset-0 z-50 overflow-auto">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowForm(false)} />
+          <div className="relative min-h-screen flex items-center justify-center p-4">
+            <Card className="w-full max-w-2xl border-0 shadow-2xl">
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <h2
+                    className="text-3xl font-bold text-foreground"
+                    style={{ fontFamily: "'Cormorant Garamond', serif" }}
+                  >
+                    {currentTier.name}
+                  </h2>
+                  <button
+                    onClick={() => setShowForm(false)}
+                    className="text-2xl text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="space-y-6 mb-8">
+                  {/* Names */}
+                  {currentTier.formFields.includes("names") && (
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Names (Who is this song for?)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g., Sarah & Michael"
+                        value={formData.names || ""}
+                        onChange={(e) => handleFormChange("names", e.target.value)}
+                        className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                    </div>
+                  )}
+
+                  {/* Special Places */}
+                  {currentTier.formFields.includes("specialPlaces") && (
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Special Places
+                      </label>
+                      <textarea
+                        placeholder="e.g., Our favorite beach in Hawaii, the park where we first met..."
+                        value={formData.specialPlaces || ""}
+                        onChange={(e) => handleFormChange("specialPlaces", e.target.value)}
+                        className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary h-24"
+                      />
+                    </div>
+                  )}
+
+                  {/* First Meeting */}
+                  {currentTier.formFields.includes("firstMeeting") && (
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        How did you first meet?
+                      </label>
+                      <textarea
+                        placeholder="Tell us the story..."
+                        value={formData.firstMeeting || ""}
+                        onChange={(e) => handleFormChange("firstMeeting", e.target.value)}
+                        className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary h-24"
+                      />
+                    </div>
+                  )}
+
+                  {/* Nicknames */}
+                  {currentTier.formFields.includes("nicknames") && (
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Nicknames & Inside Jokes
+                      </label>
+                      <textarea
+                        placeholder="Any special names or funny stories..."
+                        value={formData.nicknames || ""}
+                        onChange={(e) => handleFormChange("nicknames", e.target.value)}
+                        className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary h-24"
+                      />
+                    </div>
+                  )}
+
+                  {/* Photo Upload */}
+                  {currentTier.formFields.includes("pictures") && (
+                    <PhotoUploader
+                      photos={uploadedPhotos}
+                      onAdd={handleAddPhotos}
+                      onRemove={handleRemovePhoto}
+                      accentColor={currentTier.color}
+                    />
+                  )}
+
+                  {/* Additional Details */}
+                  {currentTier.formFields.includes("additionalDetails") && (
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Additional Details & Preferences
+                      </label>
+                      <textarea
+                        placeholder="Music style preferences, song mood, any specific requests..."
+                        value={formData.additionalDetails || ""}
+                        onChange={(e) => handleFormChange("additionalDetails", e.target.value)}
+                        className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary h-24"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-4">
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="flex-1"
+                    onClick={() => setShowForm(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="lg"
+                    className="flex-1 text-white"
+                    style={{ backgroundColor: currentTier.color }}
+                    onClick={handleSubmit}
+                  >
+                    Proceed to Checkout — ${currentTier.price}
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Footer */}
+      <footer className="bg-card border-t border-border py-8">
+        <div className="container text-center text-muted-foreground text-sm">
+          <p>© 2024 Guava Island Tunes. All rights reserved.</p>
+          <p className="mt-2">Crafted with care for your special moments.</p>
+        </div>
+      </footer>
+    </div>
+  );
+}
