@@ -26,6 +26,24 @@ const STRIPE_PAYMENT_LINKS: Record<string, string> = {
   premium: "https://buy.stripe.com/test_6oUdRabdg0sZ3TSaag4c802",
 };
 
+const MUSIC_GENRES = [
+  "Pop",
+  "R&B / Soul",
+  "Country",
+  "Hip-Hop / Rap",
+  "Rock",
+  "Jazz",
+  "Gospel / Christian",
+  "Classical / Orchestral",
+  "Folk / Acoustic",
+  "Latin",
+  "Reggae",
+  "Blues",
+  "Electronic / EDM",
+  "Hawaiian / Island",
+  "Other (describe below)",
+];
+
 const pricingTiers: PricingTier[] = [
   {
     id: "basic",
@@ -194,11 +212,58 @@ function PhotoUploader({
   );
 }
 
+// Send order notification email using EmailJS
+async function sendOrderEmail(
+  tierName: string,
+  price: number,
+  formData: Record<string, string>,
+  photoCount: number
+) {
+  const EMAILJS_SERVICE_ID = "service_zi8b6zn";
+  const EMAILJS_TEMPLATE_ID = "cot2rjz";
+  const EMAILJS_PUBLIC_KEY = "OCO6D634BTa6VIwfY";
+
+  const templateParams = {
+    to_email: "Fivestarhomerepair745@gmail.com",
+    customer_name: formData.customerName || "Not provided",
+    customer_email: formData.customerEmail || "Not provided",
+    customer_phone: formData.customerPhone || "Not provided",
+    package_name: tierName,
+    package_price: `$${price}`,
+    music_genre: formData.musicGenre || "Not specified",
+    names: formData.names || "Not provided",
+    special_places: formData.specialPlaces || "Not provided",
+    first_meeting: formData.firstMeeting || "Not provided",
+    nicknames: formData.nicknames || "Not provided",
+    additional_details: formData.additionalDetails || "None",
+    photo_count: photoCount > 0 ? `${photoCount} photos uploaded` : "No photos",
+    order_date: new Date().toLocaleString("en-US", { timeZone: "Pacific/Honolulu" }),
+    reply_to: formData.customerEmail || "Fivestarhomerepair745@gmail.com",
+  };
+
+  try {
+    const response = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        service_id: EMAILJS_SERVICE_ID,
+        template_id: EMAILJS_TEMPLATE_ID,
+        user_id: EMAILJS_PUBLIC_KEY,
+        template_params: templateParams,
+      }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 export default function CustomSongs() {
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [uploadedPhotos, setUploadedPhotos] = useState<UploadedPhoto[]>([]);
+  const [submitting, setSubmitting] = useState(false);
 
   const currentTier = pricingTiers.find((t) => t.id === selectedTier);
 
@@ -230,18 +295,55 @@ export default function CustomSongs() {
     });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!currentTier) return;
+
+    // Validate required contact fields
+    if (!formData.customerName?.trim()) {
+      alert("Please enter your name.");
+      return;
+    }
+    if (!formData.customerEmail?.trim() || !formData.customerEmail.includes("@")) {
+      alert("Please enter a valid email address.");
+      return;
+    }
+    if (!formData.customerPhone?.trim()) {
+      alert("Please enter your phone number.");
+      return;
+    }
+    if (!formData.musicGenre?.trim()) {
+      alert("Please select a music genre/style.");
+      return;
+    }
+
     const needsPhotos = currentTier.formFields.includes("pictures");
     if (needsPhotos && uploadedPhotos.length === 0) {
       alert("Please upload at least one photo for your slideshow.");
       return;
     }
+
+    setSubmitting(true);
+
+    // Send order notification email to Joey Kim
+    await sendOrderEmail(
+      currentTier.name,
+      currentTier.price,
+      formData,
+      uploadedPhotos.length
+    );
+
     // Redirect to Stripe Checkout
     const paymentLink = STRIPE_PAYMENT_LINKS[currentTier.id];
     if (paymentLink) {
-      window.location.href = paymentLink;
+      // Pass customer email to Stripe for receipt
+      const url = new URL(paymentLink);
+      if (formData.customerEmail) {
+        url.searchParams.set("prefilled_email", formData.customerEmail);
+      }
+      window.location.href = url.toString();
     }
+
+    setSubmitting(false);
   };
 
   return (
@@ -293,7 +395,7 @@ export default function CustomSongs() {
                   <h2 className="text-2xl font-bold mb-2" style={{ fontFamily: "'Cormorant Garamond', serif" }}>
                     {tier.name}
                   </h2>
-                  <p className="text-sm opacity-90">{tier.description}</p>
+                  <p className="text-white/80 text-sm">{tier.description}</p>
                 </div>
 
                 <div className="p-6 flex-1 flex flex-col">
@@ -350,92 +452,172 @@ export default function CustomSongs() {
                   </button>
                 </div>
 
-                <div className="space-y-6 mb-8">
-                  {/* Names */}
-                  {currentTier.formFields.includes("names") && (
+                {/* ── CONTACT INFORMATION ── */}
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-foreground mb-4 pb-2 border-b border-border">
+                    Your Contact Information
+                  </h3>
+                  <div className="space-y-4">
+                    {/* Customer Name */}
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-2">
-                        Names (Who is this song for?)
+                        Your Full Name <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
-                        placeholder="e.g., Sarah & Michael"
-                        value={formData.names || ""}
-                        onChange={(e) => handleFormChange("names", e.target.value)}
+                        placeholder="e.g., Sarah Johnson"
+                        value={formData.customerName || ""}
+                        onChange={(e) => handleFormChange("customerName", e.target.value)}
                         className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                       />
                     </div>
-                  )}
 
-                  {/* Special Places */}
-                  {currentTier.formFields.includes("specialPlaces") && (
+                    {/* Customer Email */}
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-2">
-                        Special Places
+                        Your Email Address <span className="text-red-500">*</span>
                       </label>
-                      <textarea
-                        placeholder="e.g., Our favorite beach in Hawaii, the park where we first met..."
-                        value={formData.specialPlaces || ""}
-                        onChange={(e) => handleFormChange("specialPlaces", e.target.value)}
-                        className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary h-24"
+                      <input
+                        type="email"
+                        placeholder="e.g., sarah@email.com"
+                        value={formData.customerEmail || ""}
+                        onChange={(e) => handleFormChange("customerEmail", e.target.value)}
+                        className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                       />
+                      <p className="text-xs text-muted-foreground mt-1">Your receipt and song delivery will be sent here.</p>
                     </div>
-                  )}
 
-                  {/* First Meeting */}
-                  {currentTier.formFields.includes("firstMeeting") && (
+                    {/* Customer Phone */}
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-2">
-                        How did you first meet?
+                        Your Phone Number <span className="text-red-500">*</span>
                       </label>
-                      <textarea
-                        placeholder="Tell us the story..."
-                        value={formData.firstMeeting || ""}
-                        onChange={(e) => handleFormChange("firstMeeting", e.target.value)}
-                        className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary h-24"
+                      <input
+                        type="tel"
+                        placeholder="e.g., (808) 555-1234"
+                        value={formData.customerPhone || ""}
+                        onChange={(e) => handleFormChange("customerPhone", e.target.value)}
+                        className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                       />
                     </div>
-                  )}
+                  </div>
+                </div>
 
-                  {/* Nicknames */}
-                  {currentTier.formFields.includes("nicknames") && (
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">
-                        Nicknames & Inside Jokes
-                      </label>
-                      <textarea
-                        placeholder="Any special names or funny stories..."
-                        value={formData.nicknames || ""}
-                        onChange={(e) => handleFormChange("nicknames", e.target.value)}
-                        className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary h-24"
+                {/* ── MUSIC PREFERENCES ── */}
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-foreground mb-4 pb-2 border-b border-border">
+                    Music Style
+                  </h3>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Preferred Genre / Music Style <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={formData.musicGenre || ""}
+                      onChange={(e) => handleFormChange("musicGenre", e.target.value)}
+                      className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      <option value="">Select a genre...</option>
+                      {MUSIC_GENRES.map((genre) => (
+                        <option key={genre} value={genre}>{genre}</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-muted-foreground mt-1">Choose the style that best fits your vision. You can add more detail below.</p>
+                  </div>
+                </div>
+
+                {/* ── YOUR STORY ── */}
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold text-foreground mb-4 pb-2 border-b border-border">
+                    Your Story
+                  </h3>
+                  <div className="space-y-6">
+                    {/* Names */}
+                    {currentTier.formFields.includes("names") && (
+                      <div>
+                        <label className="block text-sm font-medium text-foreground mb-2">
+                          Names (Who is this song for?)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g., Sarah & Michael"
+                          value={formData.names || ""}
+                          onChange={(e) => handleFormChange("names", e.target.value)}
+                          className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                        />
+                      </div>
+                    )}
+
+                    {/* Special Places */}
+                    {currentTier.formFields.includes("specialPlaces") && (
+                      <div>
+                        <label className="block text-sm font-medium text-foreground mb-2">
+                          Special Places
+                        </label>
+                        <textarea
+                          placeholder="e.g., Our favorite beach in Hawaii, the park where we first met..."
+                          value={formData.specialPlaces || ""}
+                          onChange={(e) => handleFormChange("specialPlaces", e.target.value)}
+                          className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary h-24"
+                        />
+                      </div>
+                    )}
+
+                    {/* First Meeting */}
+                    {currentTier.formFields.includes("firstMeeting") && (
+                      <div>
+                        <label className="block text-sm font-medium text-foreground mb-2">
+                          How did you first meet / What is this occasion?
+                        </label>
+                        <textarea
+                          placeholder="Tell us the story..."
+                          value={formData.firstMeeting || ""}
+                          onChange={(e) => handleFormChange("firstMeeting", e.target.value)}
+                          className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary h-24"
+                        />
+                      </div>
+                    )}
+
+                    {/* Nicknames */}
+                    {currentTier.formFields.includes("nicknames") && (
+                      <div>
+                        <label className="block text-sm font-medium text-foreground mb-2">
+                          Nicknames, Inside Jokes & Special Memories
+                        </label>
+                        <textarea
+                          placeholder="Any special names, funny stories, or memorable moments..."
+                          value={formData.nicknames || ""}
+                          onChange={(e) => handleFormChange("nicknames", e.target.value)}
+                          className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary h-24"
+                        />
+                      </div>
+                    )}
+
+                    {/* Photo Upload */}
+                    {currentTier.formFields.includes("pictures") && (
+                      <PhotoUploader
+                        photos={uploadedPhotos}
+                        onAdd={handleAddPhotos}
+                        onRemove={handleRemovePhoto}
+                        accentColor={currentTier.color}
                       />
-                    </div>
-                  )}
+                    )}
 
-                  {/* Photo Upload */}
-                  {currentTier.formFields.includes("pictures") && (
-                    <PhotoUploader
-                      photos={uploadedPhotos}
-                      onAdd={handleAddPhotos}
-                      onRemove={handleRemovePhoto}
-                      accentColor={currentTier.color}
-                    />
-                  )}
-
-                  {/* Additional Details */}
-                  {currentTier.formFields.includes("additionalDetails") && (
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">
-                        Additional Details & Preferences
-                      </label>
-                      <textarea
-                        placeholder="Music style preferences, song mood, any specific requests..."
-                        value={formData.additionalDetails || ""}
-                        onChange={(e) => handleFormChange("additionalDetails", e.target.value)}
-                        className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary h-24"
-                      />
-                    </div>
-                  )}
+                    {/* Additional Details */}
+                    {currentTier.formFields.includes("additionalDetails") && (
+                      <div>
+                        <label className="block text-sm font-medium text-foreground mb-2">
+                          Additional Details & Preferences
+                        </label>
+                        <textarea
+                          placeholder="Music style preferences, song mood, tempo, any specific requests..."
+                          value={formData.additionalDetails || ""}
+                          onChange={(e) => handleFormChange("additionalDetails", e.target.value)}
+                          className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary h-24"
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex gap-4">
@@ -444,6 +626,7 @@ export default function CustomSongs() {
                     size="lg"
                     className="flex-1"
                     onClick={() => setShowForm(false)}
+                    disabled={submitting}
                   >
                     Cancel
                   </Button>
@@ -452,10 +635,15 @@ export default function CustomSongs() {
                     className="flex-1 text-white"
                     style={{ backgroundColor: currentTier.color }}
                     onClick={handleSubmit}
+                    disabled={submitting}
                   >
-                    Proceed to Checkout — ${currentTier.price}
+                    {submitting ? "Sending..." : `Proceed to Checkout — $${currentTier.price}`}
                   </Button>
                 </div>
+
+                <p className="text-xs text-muted-foreground text-center mt-4">
+                  Your order details will be sent to us before checkout so we can start crafting your song.
+                </p>
               </div>
             </Card>
           </div>
