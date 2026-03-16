@@ -214,9 +214,42 @@ function PhotoUploader({
 
 // EmailJS configuration
 const EMAILJS_SERVICE_ID = "service_zi8b6zn";
-const EMAILJS_OWNER_TEMPLATE_ID = "template_834adtm";  // Owner notification
-const EMAILJS_CUSTOMER_TEMPLATE_ID = "template_a0cb6ur";  // Customer confirmation
+const EMAILJS_OWNER_TEMPLATE_ID = "template_834adtm";  // Owner notification - sends to fivestarhomerepair745@gmail.com
+const EMAILJS_CUSTOMER_TEMPLATE_ID = "yz34qcq";  // Customer confirmation - CC to customer_email
 const EMAILJS_PUBLIC_KEY = "OCO6D634BTa6VIwfY";
+
+// Cloudinary configuration
+const CLOUDINARY_CLOUD_NAME = "dg6njznl3";
+const CLOUDINARY_UPLOAD_PRESET = "guava-island-tunes";
+
+// Upload a single photo to Cloudinary and return its URL
+async function uploadPhotoToCloudinary(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+  formData.append("folder", "guava-island-tunes/orders");
+
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+    { method: "POST", body: formData }
+  );
+
+  if (!response.ok) {
+    const err = await response.text();
+    console.error("Cloudinary upload error:", err);
+    throw new Error("Photo upload failed");
+  }
+
+  const data = await response.json();
+  return data.secure_url as string;
+}
+
+// Upload all photos and return array of URLs
+async function uploadAllPhotos(photos: UploadedPhoto[]): Promise<string[]> {
+  if (photos.length === 0) return [];
+  const urls = await Promise.all(photos.map((p) => uploadPhotoToCloudinary(p.file)));
+  return urls;
+}
 
 // Send email via EmailJS REST API
 async function sendEmail(templateId: string, templateParams: Record<string, string>) {
@@ -242,9 +275,25 @@ async function sendOrderEmail(
   tierName: string,
   price: number,
   formData: Record<string, string>,
-  photoCount: number
+  photoCount: number,
+  photoUrls: string[] = []
 ) {
   const orderDate = new Date().toLocaleString("en-US", { timeZone: "Pacific/Honolulu" });
+
+  // Build photo links section
+  let photoLinksText = "No photos uploaded";
+  if (photoUrls.length > 0) {
+    photoLinksText = photoUrls
+      .map((url, i) => `Photo ${i + 1}: ${url}`)
+      .join("\n");
+  }
+
+  // Build photo links text for the email
+  let photoLinksSection = "";
+  if (photoUrls.length > 0) {
+    photoLinksSection = `\n\n--- CUSTOMER PHOTOS (${photoUrls.length}) ---\n` +
+      photoUrls.map((url, i) => `Photo ${i + 1}: ${url}`).join("\n");
+  }
 
   const ownerParams = {
     customer_name: formData.customerName || "Not provided",
@@ -256,10 +305,11 @@ async function sendOrderEmail(
     occasion: formData.occasion || "Not specified",
     names: formData.names || "Not provided",
     special_places: formData.specialPlaces || "Not provided",
-    first_meeting: formData.firstMeeting || "Not provided",
+    story: formData.firstMeeting || "Not provided",
     nicknames: formData.nicknames || "Not provided",
-    additional_details: formData.additionalDetails || "None",
-    photo_count: photoCount > 0 ? `${photoCount} photos uploaded` : "No photos",
+    additional_notes: (formData.additionalDetails || "None") + photoLinksSection,
+    photo_count: photoCount > 0 ? `${photoCount} photo(s) uploaded` : "No photos",
+    photo_links: photoLinksText,
     order_date: orderDate,
   };
 
@@ -272,16 +322,15 @@ async function sendOrderEmail(
     order_date: orderDate,
   };
 
-  // Send both emails in parallel
-  const [ownerResult, customerResult] = await Promise.allSettled([
-    sendEmail(EMAILJS_OWNER_TEMPLATE_ID, ownerParams),
-    formData.customerEmail ? sendEmail(EMAILJS_CUSTOMER_TEMPLATE_ID, customerParams) : Promise.resolve(false),
-  ]);
+  // Add customer_email to owner params so the template CC field sends to customer
+  ownerParams.customer_email = formData.customerEmail || "";
 
-  console.log("Owner email:", ownerResult);
-  console.log("Customer email:", customerResult);
+  // Send owner notification (template has CC: {{customer_email}} so customer gets a copy too)
+  const ownerResult = await sendEmail(EMAILJS_OWNER_TEMPLATE_ID, ownerParams);
 
-  return ownerResult.status === "fulfilled" && ownerResult.value;
+  console.log("Owner email result:", ownerResult);
+
+  return ownerResult;
 }
 
 export default function CustomSongs() {
@@ -350,12 +399,24 @@ export default function CustomSongs() {
 
     setSubmitting(true);
 
-    // Send order notification email to Joey Kim
+    // Upload photos to Cloudinary first (if any)
+    let photoUrls: string[] = [];
+    if (uploadedPhotos.length > 0) {
+      try {
+        photoUrls = await uploadAllPhotos(uploadedPhotos);
+      } catch (err) {
+        console.error("Photo upload error:", err);
+        // Continue even if photo upload fails — don't block the order
+      }
+    }
+
+    // Send order notification email to Joey Kim (with photo links)
     await sendOrderEmail(
       currentTier.name,
       currentTier.price,
       formData,
-      uploadedPhotos.length
+      uploadedPhotos.length,
+      photoUrls
     );
 
     // Redirect to Stripe Checkout
