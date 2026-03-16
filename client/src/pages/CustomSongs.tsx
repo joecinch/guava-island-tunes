@@ -21,9 +21,10 @@ interface PricingTier {
 }
 
 const STRIPE_PAYMENT_LINKS: Record<string, string> = {
-  basic: "https://buy.stripe.com/test_cNicN60yC1x3fCA96c4c800",
-  video: "https://buy.stripe.com/test_fZu6oIa9ca3z1LK8284c801",
-  premium: "https://buy.stripe.com/test_6oUdRabdg0sZ3TSaag4c802",
+  basic: "https://buy.stripe.com/4gM9AU2GK1HQ3lJaRG4AU03",
+  video: "https://buy.stripe.com/cNifZigxA1HQaOb8Jy4AU04",    // Custom Song + Slideshow ($450)
+  slideshow: "https://buy.stripe.com/cNifZigxA1HQaOb8Jy4AU04", // alias
+  premium: "https://buy.stripe.com/14AcN64OS1HQaOb8Jy4AU05",
 };
 
 const MUSIC_GENRES = [
