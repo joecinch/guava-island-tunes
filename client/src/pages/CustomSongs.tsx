@@ -212,50 +212,76 @@ function PhotoUploader({
   );
 }
 
-// Send order notification email using EmailJS
+// EmailJS configuration
+const EMAILJS_SERVICE_ID = "service_zi8b6zn";
+const EMAILJS_OWNER_TEMPLATE_ID = "template_834adtm";  // Owner notification
+const EMAILJS_CUSTOMER_TEMPLATE_ID = "yz34qcq";         // Customer confirmation
+const EMAILJS_PUBLIC_KEY = "OCO6D634BTa6VIwfY";
+
+// Send email via EmailJS REST API
+async function sendEmail(templateId: string, templateParams: Record<string, string>) {
+  const response = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      service_id: EMAILJS_SERVICE_ID,
+      template_id: templateId,
+      user_id: EMAILJS_PUBLIC_KEY,
+      template_params: templateParams,
+    }),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    console.error("EmailJS error:", response.status, text);
+  }
+  return response.ok;
+}
+
+// Send order notification email to owner (Joey Kim)
 async function sendOrderEmail(
   tierName: string,
   price: number,
   formData: Record<string, string>,
   photoCount: number
 ) {
-  const EMAILJS_SERVICE_ID = "service_zi8b6zn";
-  const EMAILJS_TEMPLATE_ID = "cot2rjz";
-  const EMAILJS_PUBLIC_KEY = "OCO6D634BTa6VIwfY";
+  const orderDate = new Date().toLocaleString("en-US", { timeZone: "Pacific/Honolulu" });
 
-  const templateParams = {
-    to_email: "Fivestarhomerepair745@gmail.com",
+  const ownerParams = {
     customer_name: formData.customerName || "Not provided",
     customer_email: formData.customerEmail || "Not provided",
     customer_phone: formData.customerPhone || "Not provided",
     package_name: tierName,
     package_price: `$${price}`,
     music_genre: formData.musicGenre || "Not specified",
+    occasion: formData.occasion || "Not specified",
     names: formData.names || "Not provided",
     special_places: formData.specialPlaces || "Not provided",
     first_meeting: formData.firstMeeting || "Not provided",
     nicknames: formData.nicknames || "Not provided",
     additional_details: formData.additionalDetails || "None",
     photo_count: photoCount > 0 ? `${photoCount} photos uploaded` : "No photos",
-    order_date: new Date().toLocaleString("en-US", { timeZone: "Pacific/Honolulu" }),
-    reply_to: formData.customerEmail || "Fivestarhomerepair745@gmail.com",
+    order_date: orderDate,
   };
 
-  try {
-    const response = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        service_id: EMAILJS_SERVICE_ID,
-        template_id: EMAILJS_TEMPLATE_ID,
-        user_id: EMAILJS_PUBLIC_KEY,
-        template_params: templateParams,
-      }),
-    });
-    return response.ok;
-  } catch {
-    return false;
-  }
+  const customerParams = {
+    customer_name: formData.customerName || "Valued Customer",
+    customer_email: formData.customerEmail || "",
+    package_name: tierName,
+    package_price: `$${price}`,
+    music_genre: formData.musicGenre || "Not specified",
+    order_date: orderDate,
+  };
+
+  // Send both emails in parallel
+  const [ownerResult, customerResult] = await Promise.allSettled([
+    sendEmail(EMAILJS_OWNER_TEMPLATE_ID, ownerParams),
+    formData.customerEmail ? sendEmail(EMAILJS_CUSTOMER_TEMPLATE_ID, customerParams) : Promise.resolve(false),
+  ]);
+
+  console.log("Owner email:", ownerResult);
+  console.log("Customer email:", customerResult);
+
+  return ownerResult.status === "fulfilled" && ownerResult.value;
 }
 
 export default function CustomSongs() {
