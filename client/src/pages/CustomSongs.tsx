@@ -215,7 +215,7 @@ function PhotoUploader({
 // EmailJS configuration
 const EMAILJS_SERVICE_ID = "service_zi8b6zn";
 const EMAILJS_OWNER_TEMPLATE_ID = "template_834adtm";  // Owner notification
-const EMAILJS_CUSTOMER_TEMPLATE_ID = "yz34qcq";         // Customer confirmation
+const EMAILJS_CUSTOMER_TEMPLATE_ID = "template_a0cb6ur";  // Customer confirmation
 const EMAILJS_PUBLIC_KEY = "OCO6D634BTa6VIwfY";
 
 // Send email via EmailJS REST API
@@ -621,12 +621,20 @@ export default function CustomSongs() {
 
                     {/* Photo Upload */}
                     {currentTier.formFields.includes("pictures") && (
-                      <PhotoUploader
-                        photos={uploadedPhotos}
-                        onAdd={handleAddPhotos}
-                        onRemove={handleRemovePhoto}
-                        accentColor={currentTier.color}
-                      />
+                      <div className="rounded-xl border-2 p-4" style={{ borderColor: currentTier.color, backgroundColor: `${currentTier.color}10` }}>
+                        <div className="flex items-center gap-2 mb-3">
+                          <ImageIcon className="w-5 h-5" style={{ color: currentTier.color }} />
+                          <h4 className="font-semibold text-base" style={{ color: currentTier.color }}>Upload Your Photos</h4>
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: currentTier.color }}>REQUIRED</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-3">Upload 3–20 photos to be used in your custom slideshow. These will be set to your song.</p>
+                        <PhotoUploader
+                          photos={uploadedPhotos}
+                          onAdd={handleAddPhotos}
+                          onRemove={handleRemovePhoto}
+                          accentColor={currentTier.color}
+                        />
+                      </div>
                     )}
 
                     {/* Additional Details */}
